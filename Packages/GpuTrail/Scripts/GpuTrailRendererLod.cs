@@ -241,7 +241,7 @@ namespace GpuTrailSystem
         }
 
 
-        public void Render(Material material, float startWidth, float endWidth, in Bounds bounds)
+        public void Render(Material material, float startWidth, float endWidth, in Bounds bounds, Camera camera)
         {
             PropertyBlock.SetFloat(ShaderParam.StartWidth, startWidth);
             PropertyBlock.SetFloat(ShaderParam.EndWidth, endWidth);
@@ -252,7 +252,10 @@ namespace GpuTrailSystem
                 matProps = PropertyBlock,
                 worldBounds = bounds
             };
-            
+            if (camera != null)
+            {
+                renderParams.camera = camera;
+            }
             Graphics.RenderPrimitivesIndexedIndirect(renderParams, MeshTopology.Triangles, indexBuffer, argsBuffer);
         }
 

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 
 namespace GpuTrailSystem
 {
@@ -69,9 +71,10 @@ namespace GpuTrailSystem
         public bool renderingEnable = true;
 
         protected GpuTrail GpuTrail => gpuTrailAppendNode.GpuTrail;
-        protected virtual Camera TargetCamera => targetCamera != null ? targetCamera : targetCamera = Camera.main;
+        protected virtual Camera TargetCamera => targetCamera != null ? targetCamera : Camera.main;
 
-
+        protected bool IsNoCulling => (targetCamera == null  && !cullingEnable);
+        
         #region Unity
 
         protected virtual void Start()
@@ -84,6 +87,11 @@ namespace GpuTrailSystem
             gpuTrailAppendNode ??= GetComponent<IGpuTrailAppendNode>();
 
             if (!lodSettings.Any()) lodSettings.Add(new LodSetting());
+            
+            if (GraphicsSettings.currentRenderPipeline != null)
+            {
+                RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
+            }
         }
 
 
@@ -97,6 +105,29 @@ namespace GpuTrailSystem
                 gpuTrailAppendNode.AppendNode();
             }
 
+            if (IsNoCulling)
+            {
+                UpdateVertex(TargetCamera);
+                Render(TargetCamera);
+            }
+        }
+
+        public virtual void OnDestroy()
+        {
+            DisposeLodList();
+            defaultCulling?.Dispose();
+            defaultCalcLod?.Dispose();
+            
+            if (GraphicsSettings.currentRenderPipeline != null)
+            {
+                RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
+            }
+        }
+
+        #endregion
+
+        protected virtual void UpdateVertex(Camera camera)
+        {
             // Culling
             GraphicsBuffer trailIndexBufferCulling = null;
             if (cullingEnable)
@@ -107,8 +138,10 @@ namespace GpuTrailSystem
                     calcTrailIndexBufferCulling = defaultCulling.CalcTrailIndexBuffer;
                 }
 
+                Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCulling");
                 float width = Mathf.Max(startWidth, endWidth);
-                trailIndexBufferCulling = calcTrailIndexBufferCulling(TargetCamera, GpuTrail, width);
+                trailIndexBufferCulling = calcTrailIndexBufferCulling(camera, GpuTrail, width);
+                Profiler.EndSample();
             }
 
             // CalcLod
@@ -122,20 +155,25 @@ namespace GpuTrailSystem
                     calcTrailIndexBufferCalcLod = defaultCalcLod.CalcTrailIndexBuffers;
                 }
 
-                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), TargetCamera, GpuTrail, trailIndexBufferCulling);
+                Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCalcLod");
+                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling);
+                Profiler.EndSample();
             }
             
             // UpdateVertex
             if (updateVertexEnable)
             {
+                Profiler.BeginSample("GpuTrailRenderer.UpdateVertexBuffer");
                 ForeachLod((lod, idx) =>
                 {
                     var trailIndexBuffer = trailIndexBuffersLod?[idx] ?? trailIndexBufferCulling;
-                    lod.UpdateVertexBuffer(TargetCamera, startWidth, endWidth, trailIndexBuffer);
+                    lod.UpdateVertexBuffer(camera, startWidth, endWidth, trailIndexBuffer);
                 });
+                Profiler.EndSample();
             }
             
 
+            Profiler.BeginSample("GpuTrailRenderer.UpdateArgsBuffer");
             // UpdateArgsBuffer
             ForeachLod((lod, idx) =>
             {
@@ -149,7 +187,11 @@ namespace GpuTrailSystem
                     lod.ResetArgsBuffer();
                 }
             });
-            
+            Profiler.EndSample();
+        }
+
+        protected virtual void Render(Camera camera)
+        {
             // Rendering
             if (renderingEnable)
             {
@@ -160,22 +202,11 @@ namespace GpuTrailSystem
                     var material = settings.material;
                     if (material == null) material = defaultMaterial;
 
-                    lod.Render(material, startWidth, endWidth, bounds);
+                    lod.Render(material, startWidth, endWidth, bounds, camera);
                 });
             }
         }
-
-        public virtual void OnDestroy()
-        {
-            DisposeLodList();
-            defaultCulling?.Dispose();
-            defaultCalcLod?.Dispose();
-        }
-
-        #endregion
-
-
-
+        
         void ForeachLod(Action<GpuTrailRendererLod, int> action)
         {
             for (var i = 0; i < lodList.Count; ++i)
@@ -200,7 +231,31 @@ namespace GpuTrailSystem
             lodList.Clear();
         }
 
+        /// <summary>
+        /// カメラごとのレンダリング前のカリング処理(カリング有効時のみ)
+        /// Per-camera pre-render culling 
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="camera"></param>
+        protected virtual void OnBeginCameraRendering(ScriptableRenderContext context, Camera camera)
+        {
+            if (lodSettings.Count != lodList.Count) ResetLodList();
 
+            if(targetCamera != null && targetCamera != camera)
+                return;
+
+            var layer = 1 << gameObject.layer;
+            if((camera.cullingMask & layer) == 0)
+                return;
+            
+            if (!cullingEnable)
+                return;
+            
+            UpdateVertex(camera);
+            Render(camera);
+        }
+
+        
         #region Debug
 
         public void OnDrawGizmosSelected()
