@@ -92,6 +92,10 @@ namespace GpuTrailSystem
             {
                 RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             }
+            else
+            {
+                Camera.onPreCull += OnPreCullCallback;
+            }
         }
 
 
@@ -121,6 +125,10 @@ namespace GpuTrailSystem
             if (GraphicsSettings.currentRenderPipeline != null)
             {
                 RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
+            }
+            else
+            {
+                Camera.onPreCull -= OnPreCullCallback;
             }
         }
 
@@ -232,30 +240,51 @@ namespace GpuTrailSystem
         }
 
         /// <summary>
-        /// カメラごとのレンダリング前のカリング処理(カリング有効時のみ)
-        /// Per-camera pre-render culling 
+        /// カメラごとのレンダリング前のカリング処理(カリング有効時のみ) for URP/HDRP
+        /// Per-camera pre-render culling for URP/HDRP
         /// </summary>
         /// <param name="context"></param>
-        /// <param name="camera"></param>
-        protected virtual void OnBeginCameraRendering(ScriptableRenderContext context, Camera camera)
+        /// <param name="cam"></param>
+        protected virtual void OnBeginCameraRendering(ScriptableRenderContext context, Camera cam)
         {
             if (lodSettings.Count != lodList.Count) ResetLodList();
 
-            if(targetCamera != null && targetCamera != camera)
+            if(targetCamera != null && targetCamera != cam)
                 return;
 
             var layer = 1 << gameObject.layer;
-            if((camera.cullingMask & layer) == 0)
+            if((cam.cullingMask & layer) == 0)
                 return;
             
             if (!cullingEnable)
                 return;
             
-            UpdateVertex(camera);
-            Render(camera);
+            UpdateVertex(cam);
+            Render(cam);
         }
 
+
+        /// <summary>
+        /// カメラごとのレンダリング前のカリング処理（カリング有効時のみ） for Built-in RP
+        /// Per-camera pre-render culling for Built-in RP
+        /// </summary>
+        /// <param name="cam"></param>
+        private void OnPreCullCallback(Camera cam)
+        {
+            if(targetCamera != null && targetCamera != cam)
+                return;
         
+            var layer = 1 << gameObject.layer;
+            if((cam.cullingMask & layer) == 0)
+                return;
+            
+            if (!cullingEnable)
+                return;
+            
+            UpdateVertex(cam);
+            Render(cam);
+        }
+
         #region Debug
 
         public void OnDrawGizmosSelected()
