@@ -1,0 +1,85 @@
+#pragma kernel InitBounds NUM_THREAD_X=256
+#pragma kernel CalcBounds NUM_THREAD_X=256
+#pragma kernel CopyBounds NUM_THREAD_X=256
+
+#include "GpuTrailCSInclude.hlsl"
+#include "GpuTrailAABBCSInclude.hlsl"
+
+RWStructuredBuffer<Trail> _TrailBuffer;
+RWStructuredBuffer<Node> _NodeBuffer;
+RWStructuredBuffer<AABB> _AABBBuffer;
+RWStructuredBuffer<AABB> _ResultBufferRW;
+
+int _BufferLength;
+int _Step;
+float _TrailWidth;
+
+[numthreads(NUM_THREAD_X,1,1)]
+void InitBounds (uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    uint trailIdx = calcTrailIdx(idx);
+    if ( trailIdx >= _TrailNum )
+        return;
+    
+    Trail trail = _TrailBuffer[trailIdx];
+    uint totalInputNum = trail.totalInputNum;
+
+    uint nodeNo = (idx % _NodeNumPerTrail);
+    uint nodeIndex = (trailIdx * _NodeNumPerTrail) + nodeNo;
+
+    if(nodeNo >= _NodeNumPerTrail) return;
+    
+    if(nodeNo < totalInputNum)
+    {
+        Node node = _NodeBuffer[nodeIndex];
+        _AABBBuffer[nodeIndex].minPos = node.pos;
+        _AABBBuffer[nodeIndex].maxPos = node.pos;
+    }
+    else
+    {
+        // 範囲外はダミーデータを入れる
+        _AABBBuffer[nodeIndex].minPos = float3(3.402823466e+38F, 3.402823466e+38F, 3.402823466e+38F);
+        _AABBBuffer[nodeIndex].maxPos = float3(-3.402823466e+38F, -3.402823466e+38F, -3.402823466e+38F);
+    }
+}
+
+[numthreads(NUM_THREAD_X,1,1)]
+void CalcBounds (uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    uint trailIdx = idx / _Step;
+    if ( trailIdx >= _TrailNum )
+        return;
+    
+    uint nodeNo = (idx % _Step);
+    uint nodeIndex = (trailIdx * _NodeNumPerTrail) + nodeNo;
+    uint nodeIndex2 = nodeIndex + _Step;
+
+    if(nodeNo >= _BufferLength)
+        return;
+    
+    AABB data1 = _AABBBuffer[nodeIndex];
+    AABB data2 = _AABBBuffer[nodeIndex2];
+
+    AABB data3;
+    data3.minPos = min(data1.minPos, data2.minPos);
+    data3.maxPos = max(data1.maxPos, data2.maxPos);
+    
+    _AABBBuffer[nodeIndex] = data3;
+}
+
+[numthreads(NUM_THREAD_X,1,1)]
+void CopyBounds (uint3 id : SV_DispatchThreadID)
+{
+    uint trailIdx = id.x;
+    if ( trailIdx >= _TrailNum )
+        return;
+
+    uint nodeIndex = (trailIdx * _NodeNumPerTrail);
+
+    AABB data = _AABBBuffer[nodeIndex];
+
+    _ResultBufferRW[trailIdx].minPos = data.minPos - _TrailWidth / 2;
+    _ResultBufferRW[trailIdx].maxPos = data.maxPos + _TrailWidth / 2;
+}

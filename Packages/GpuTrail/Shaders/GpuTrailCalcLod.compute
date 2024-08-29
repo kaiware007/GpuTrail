@@ -5,7 +5,7 @@
 
 #include "GpuTrailCSInclude.hlsl"
 #include "GpuTrailIndexInclude.hlsl"
-
+#include "GpuTrailAABBCSInclude.hlsl"
 
 ////////////////////////////////////////////////////////////////////////////////
 // UpdateTrailIdxBuffer
@@ -14,6 +14,7 @@ float3 _CameraPos;
 StructuredBuffer<Node> _NodeBuffer;
 StructuredBuffer<float> _LodDistanceBuffer; // Order By distance
 RWStructuredBuffer<uint> _TrailLodBufferW;
+StructuredBuffer<AABB> _BoundsBuffer;
 
 [numthreads(NUM_THREAD_X,1,1)]
 void UpdateTrailLodBuffer (uint3 id : SV_DispatchThreadID)
@@ -23,22 +24,26 @@ void UpdateTrailLodBuffer (uint3 id : SV_DispatchThreadID)
 	{
 		uint trailIdx = GetTrailIdx(trailIdxBufferIdx);
 
-		float minDistanceSq = -1.0;
-
-		uint nodeIdxStart = calcNodeIdx(trailIdx, 0);
-		uint nodeIdxEnd = nodeIdxStart + _NodeNumPerTrail;
-		for(uint nodeIdx = nodeIdxStart; nodeIdx < nodeIdxEnd; nodeIdx++)
-		{
-			Node node = _NodeBuffer[nodeIdx];
-			if ( node.time > 0)
-			{
-				float3 posFromCamera = node.pos - _CameraPos;
-				float distanceSq = dot(posFromCamera, posFromCamera);
-
-				minDistanceSq = (minDistanceSq<0) ? distanceSq : min(minDistanceSq, distanceSq);
-			}
-		}
-	
+		AABB bounds = _BoundsBuffer[trailIdx];
+		float3 center = (bounds.minPos + bounds.maxPos) * 0.5 - _CameraPos;
+		float3 minPos = bounds.minPos - _CameraPos;
+		float3 maxPos = bounds.maxPos - _CameraPos;
+		float3 p2 = float3(maxPos.x, minPos.y, minPos.z);
+		float3 p3 = float3(maxPos.x, minPos.y, maxPos.z);
+		float3 p4 = float3(minPos.x, minPos.y, maxPos.z);
+		float3 p5 = float3(minPos.x, maxPos.y, minPos.z);
+		float3 p6 = float3(maxPos.x, maxPos.y, minPos.z);
+		float3 p7 = float3(minPos.x, maxPos.y, maxPos.z);
+		
+		float minDistanceSq = dot(center, center);
+		minDistanceSq = min(minDistanceSq, dot(minPos, minPos));
+		minDistanceSq = min(minDistanceSq, dot(maxPos, maxPos));
+		minDistanceSq = min(minDistanceSq, dot(p2, p2));
+		minDistanceSq = min(minDistanceSq, dot(p3, p3));
+		minDistanceSq = min(minDistanceSq, dot(p4, p4));
+		minDistanceSq = min(minDistanceSq, dot(p5, p5));
+		minDistanceSq = min(minDistanceSq, dot(p6, p6));
+		minDistanceSq = min(minDistanceSq, dot(p7, p7));
 
 		float minDistance = sqrt(minDistanceSq);
 

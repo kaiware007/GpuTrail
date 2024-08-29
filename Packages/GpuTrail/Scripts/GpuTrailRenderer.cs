@@ -39,6 +39,7 @@ namespace GpuTrailSystem
 
 
         public ComputeShader trailIndexDispatcherCS;
+        public ComputeShader calcBoundsCS;
         public ComputeShader calcLodCS;
         public ComputeShader cullingCS;
         public ComputeShader updateVertexCS;
@@ -54,11 +55,13 @@ namespace GpuTrailSystem
         protected IGpuTrailAppendNode gpuTrailAppendNode;
 
         // Culling/CalcLod function can be customized.
-        public Func<Camera, GpuTrail, float, GraphicsBuffer> calcTrailIndexBufferCulling;
-        public Func<IEnumerable<float>, Camera, GpuTrail, GraphicsBuffer, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
+        public Func<Camera, GpuTrail, GraphicsBuffer, GraphicsBuffer> calcTrailIndexBufferCulling;
+        public Func<IEnumerable<float>, Camera, GpuTrail, GraphicsBuffer, GraphicsBuffer, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
 
         protected GpuTrailRendererCulling defaultCulling;
         protected GpuTrailRendererCalcLod defaultCalcLod;
+        
+        protected GpuTrailCalcBounds calcBounds;
         
         [SerializeField]
         protected List<LodSetting> lodSettings = new();
@@ -69,7 +72,10 @@ namespace GpuTrailSystem
         public bool cullingEnable = true;
         public bool updateVertexEnable = true;
         public bool renderingEnable = true;
-
+        public bool drawBoundsEnable = false;
+        [SerializeField] 
+        private Material boundsMaterial;
+        
         protected GpuTrail GpuTrail => gpuTrailAppendNode.GpuTrail;
         protected virtual Camera TargetCamera => targetCamera != null ? targetCamera : Camera.main;
 
@@ -121,6 +127,7 @@ namespace GpuTrailSystem
             DisposeLodList();
             defaultCulling?.Dispose();
             defaultCalcLod?.Dispose();
+            calcBounds?.Dispose();
             
             if (GraphicsSettings.currentRenderPipeline != null)
             {
@@ -136,6 +143,23 @@ namespace GpuTrailSystem
 
         protected virtual void UpdateVertex(Camera camera)
         {
+            bool needCalcLod = lodSettings.Count > 1;
+            
+            // Calc Bounds
+            GraphicsBuffer boundsBuffer = null;
+            if (cullingEnable || needCalcLod)
+            {
+                calcBounds ??= new GpuTrailCalcBounds(calcBoundsCS);
+
+                Profiler.BeginSample("GpuTrailRenderer.CalcBounds");
+                boundsBuffer = calcBounds.CalcBounds(GpuTrail.TrailBuffer, GpuTrail.NodeBuffer, GpuTrail.NodeNumPerTrail, Mathf.Max(startWidth, endWidth));
+                Profiler.EndSample();
+                if (drawBoundsEnable)
+                {
+                    calcBounds.DrawBounds(boundsMaterial);
+                }
+            }
+            
             // Culling
             GraphicsBuffer trailIndexBufferCulling = null;
             if (cullingEnable)
@@ -147,14 +171,12 @@ namespace GpuTrailSystem
                 }
 
                 Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCulling");
-                float width = Mathf.Max(startWidth, endWidth);
-                trailIndexBufferCulling = calcTrailIndexBufferCulling(camera, GpuTrail, width);
+                trailIndexBufferCulling = calcTrailIndexBufferCulling(camera, GpuTrail, boundsBuffer);
                 Profiler.EndSample();
             }
 
             // CalcLod
             IReadOnlyList<GraphicsBuffer> trailIndexBuffersLod = null;
-            bool needCalcLod = lodSettings.Count > 1;
             if (needCalcLod)
             {
                 if (calcTrailIndexBufferCalcLod == null)
@@ -164,7 +186,7 @@ namespace GpuTrailSystem
                 }
 
                 Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCalcLod");
-                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling);
+                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling, boundsBuffer);
                 Profiler.EndSample();
             }
             
@@ -240,6 +262,24 @@ namespace GpuTrailSystem
         }
 
         /// <summary>
+        /// カリング有効時のレンダリング対象かどうか
+        /// </summary>
+        /// <param name="cam"></param>
+        /// <returns></returns>
+        protected virtual bool IsCullingRenderTarget(Camera cam)
+        {
+            if (lodSettings.Count != lodList.Count) ResetLodList();
+
+            if(targetCamera != null && targetCamera != cam)
+                return false;
+
+            if((cam.cullingMask & (1 << gameObject.layer)) == 0)
+                return false;
+            
+            return cullingEnable;
+        }
+        
+        /// <summary>
         /// カメラごとのレンダリング前のカリング処理(カリング有効時のみ) for URP/HDRP
         /// Per-camera pre-render culling for URP/HDRP
         /// </summary>
@@ -247,16 +287,7 @@ namespace GpuTrailSystem
         /// <param name="cam"></param>
         protected virtual void OnBeginCameraRendering(ScriptableRenderContext context, Camera cam)
         {
-            if (lodSettings.Count != lodList.Count) ResetLodList();
-
-            if(targetCamera != null && targetCamera != cam)
-                return;
-
-            var layer = 1 << gameObject.layer;
-            if((cam.cullingMask & layer) == 0)
-                return;
-            
-            if (!cullingEnable)
+            if(!IsCullingRenderTarget(cam))
                 return;
             
             UpdateVertex(cam);
@@ -269,16 +300,9 @@ namespace GpuTrailSystem
         /// Per-camera pre-render culling for Built-in RP
         /// </summary>
         /// <param name="cam"></param>
-        private void OnPreCullCallback(Camera cam)
+        protected virtual void OnPreCullCallback(Camera cam)
         {
-            if(targetCamera != null && targetCamera != cam)
-                return;
-        
-            var layer = 1 << gameObject.layer;
-            if((cam.cullingMask & layer) == 0)
-                return;
-            
-            if (!cullingEnable)
+            if(!IsCullingRenderTarget(cam))
                 return;
             
             UpdateVertex(cam);
