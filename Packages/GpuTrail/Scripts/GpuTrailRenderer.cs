@@ -239,6 +239,19 @@ namespace GpuTrailSystem
             lodList.Clear();
         }
 
+        protected bool IsCullingRenderTarget(Camera cam)
+        {
+            if (lodSettings.Count != lodList.Count) ResetLodList();
+
+            if(targetCamera != null && targetCamera != cam)
+                return false;
+
+            if((cam.cullingMask & (1 << gameObject.layer)) == 0)
+                return false;
+
+            return cullingEnable;
+        }
+        
         /// <summary>
         /// カメラごとのレンダリング前のカリング処理(カリング有効時のみ) for URP/HDRP
         /// Per-camera pre-render culling for URP/HDRP
@@ -247,16 +260,7 @@ namespace GpuTrailSystem
         /// <param name="cam"></param>
         protected virtual void OnBeginCameraRendering(ScriptableRenderContext context, Camera cam)
         {
-            if (lodSettings.Count != lodList.Count) ResetLodList();
-
-            if(targetCamera != null && targetCamera != cam)
-                return;
-
-            var layer = 1 << gameObject.layer;
-            if((cam.cullingMask & layer) == 0)
-                return;
-            
-            if (!cullingEnable)
+            if (!IsCullingRenderTarget(cam))
                 return;
             
             UpdateVertex(cam);
@@ -269,16 +273,9 @@ namespace GpuTrailSystem
         /// Per-camera pre-render culling for Built-in RP
         /// </summary>
         /// <param name="cam"></param>
-        private void OnPreCullCallback(Camera cam)
+        protected virtual void OnPreCullCallback(Camera cam)
         {
-            if(targetCamera != null && targetCamera != cam)
-                return;
-        
-            var layer = 1 << gameObject.layer;
-            if((cam.cullingMask & layer) == 0)
-                return;
-            
-            if (!cullingEnable)
+            if (!IsCullingRenderTarget(cam))
                 return;
             
             UpdateVertex(cam);
