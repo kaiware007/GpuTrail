@@ -13,7 +13,10 @@ namespace GpuTrailSystem
             public static readonly int CameraPos = Shader.PropertyToID("_CameraPos");
             public static readonly int LodDistanceBuffer = Shader.PropertyToID("_LodDistanceBuffer");
             public static readonly int TrailLodBufferW = Shader.PropertyToID("_TrailLodBufferW");
-
+            public static readonly int TrailBuffer = Shader.PropertyToID("_TrailBuffer");
+            public static readonly int ForceUpdate = Shader.PropertyToID("_ForceUpdate");
+            public static readonly int FrameCount = Shader.PropertyToID("_FrameCount");
+            
             public const string KernelUpdateTrailIndexBuffer = "UpdateTrailIndexBuffer";
             public static readonly int CurrentLod = Shader.PropertyToID("_CurrentLod");
             public static readonly int TrailLodBuffer = Shader.PropertyToID("_TrailLodBuffer");
@@ -66,7 +69,7 @@ namespace GpuTrailSystem
 
 
         // return TrailIndexBuffer in the same order as the lodDistances
-        public virtual IReadOnlyList<GraphicsBuffer> CalcTrailIndexBuffers(IEnumerable<float> lodDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer)
+        public virtual IReadOnlyList<GraphicsBuffer> CalcTrailIndexBuffers(IEnumerable<float> lodDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
         {
             var idxAndDistances = lodDistances
                 .Select((distance, idx) => (idx, distance))
@@ -80,7 +83,7 @@ namespace GpuTrailSystem
 
             UpdateTrailLodBuffer(
                  idxAndDistances.Select(pair => pair.distance).ToArray(),
-                 camera, gpuTrail, trailIndexBuffer
+                 camera, gpuTrail, trailIndexBuffer, forceUpdate
                 );
 
             UpdateTrailIndexBuffers(
@@ -93,7 +96,7 @@ namespace GpuTrailSystem
         }
 
 
-        protected void UpdateTrailLodBuffer(float[] sortedDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer)
+        protected void UpdateTrailLodBuffer(float[] sortedDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
         {
             lodDistanceBuffer.SetData(sortedDistances);
 
@@ -102,7 +105,10 @@ namespace GpuTrailSystem
             calcLodCs.SetVector(CsParam.CameraPos, camera.transform.position);
             calcLodCs.SetBuffer(kernel, CsParam.LodDistanceBuffer, lodDistanceBuffer);
             calcLodCs.SetBuffer(kernel, CsParam.TrailLodBufferW, trailLodBuffer);
-
+            calcLodCs.SetBuffer(kernel, CsParam.TrailBuffer, gpuTrail.TrailBuffer);
+            calcLodCs.SetBool(CsParam.ForceUpdate, forceUpdate);
+            calcLodCs.SetInt(CsParam.FrameCount, Time.frameCount);
+            
             if (trailIndexBuffer != null)
             {
                 gpuTrailIndexArgs.Dispatch(calcLodCs, kernel, trailIndexBuffer);

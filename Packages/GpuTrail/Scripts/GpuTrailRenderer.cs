@@ -55,7 +55,7 @@ namespace GpuTrailSystem
 
         // Culling/CalcLod function can be customized.
         public Func<Camera, GpuTrail, float, GraphicsBuffer> calcTrailIndexBufferCulling;
-        public Func<IEnumerable<float>, Camera, GpuTrail, GraphicsBuffer, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
+        public Func<IEnumerable<float>, Camera, GpuTrail, GraphicsBuffer, bool, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
 
         protected GpuTrailRendererCulling defaultCulling;
         protected GpuTrailRendererCalcLod defaultCalcLod;
@@ -111,7 +111,7 @@ namespace GpuTrailSystem
             if (targetCamera == null  && !cullingEnable)
             {
                 UpdateVertex(TargetCamera);
-                Render(TargetCamera);
+                Render(targetCamera);
             }
         }
 
@@ -151,6 +151,9 @@ namespace GpuTrailSystem
                 Profiler.EndSample();
             }
 
+            // Force update when camera position change
+            var isForceUpdate = Vector3.Distance(lastCameraPos, camera.transform.position) > float.Epsilon;
+
             // CalcLod
             IReadOnlyList<GraphicsBuffer> trailIndexBuffersLod = null;
             bool needCalcLod = lodSettings.Count > 1;
@@ -163,15 +166,13 @@ namespace GpuTrailSystem
                 }
 
                 Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCalcLod");
-                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling);
+                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling, isForceUpdate);
                 Profiler.EndSample();
             }
             
             // UpdateVertex
             if (updateVertexEnable)
             {
-                // Force update when camera position change
-                var isForceUpdate = Vector3.Distance(lastCameraPos, camera.transform.position) > float.Epsilon;
                 Profiler.BeginSample("GpuTrailRenderer.UpdateVertexBuffer");
                 ForeachLod((lod, idx) =>
                 {
@@ -179,7 +180,6 @@ namespace GpuTrailSystem
                     lod.UpdateVertexBuffer(camera, startWidth, endWidth, isForceUpdate, trailIndexBuffer);
                 });
                 Profiler.EndSample();
-                lastCameraPos = camera.transform.position;
             }
             
 
@@ -198,6 +198,7 @@ namespace GpuTrailSystem
                 }
             });
             Profiler.EndSample();
+            lastCameraPos = camera.transform.position;
         }
 
         protected virtual void Render(Camera camera)

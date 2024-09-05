@@ -24,6 +24,8 @@ namespace GpuTrailSystem
 
         public GpuTrailRendererCulling(ComputeShader cullingCs) => this.cullingCs = cullingCs;
 
+        private Plane[] planes = new Plane[6];
+        
         public void Dispose()
         {
             ReleaseBuffer();
@@ -54,7 +56,7 @@ namespace GpuTrailSystem
                 cameraPos += cameraTrans.rotation * debugCameraPosLocalOffset;
             }
 
-            var planes = GeometryUtility.CalculateFrustumPlanes(camera);
+            GeometryUtility.CalculateFrustumPlanes(camera, planes);
             var normals = planes.Take(4).Select(p => p.normal).ToList();
             var normalsFloat = Enumerable.Range(0, 3).SelectMany(i => normals.Select(n => n[i])).ToArray(); // row major -> column major
 

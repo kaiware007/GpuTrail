@@ -12,8 +12,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 float3 _CameraPos;
 StructuredBuffer<Node> _NodeBuffer;
+StructuredBuffer<Trail> _TrailBuffer;
 StructuredBuffer<float> _LodDistanceBuffer; // Order By distance
 RWStructuredBuffer<uint> _TrailLodBufferW;
+int _FrameCount;
+bool _ForceUpdate;
 
 [numthreads(NUM_THREAD_X,1,1)]
 void UpdateTrailLodBuffer (uint3 id : SV_DispatchThreadID)
@@ -23,11 +26,18 @@ void UpdateTrailLodBuffer (uint3 id : SV_DispatchThreadID)
 	{
 		uint trailIdx = GetTrailIdx(trailIdxBufferIdx);
 
+		Trail trail = _TrailBuffer[trailIdx];
+		
+		if(!_ForceUpdate && _FrameCount == trail.frameCount)
+		{
+			return;
+		}
+		
 		float minDistanceSq = -1.0;
 
 		uint nodeIdxStart = calcNodeIdx(trailIdx, 0);
 		uint nodeIdxEnd = nodeIdxStart + _NodeNumPerTrail;
-		for(uint nodeIdx = nodeIdxStart; nodeIdx < nodeIdxEnd; nodeIdx++)
+		for(uint nodeIdx = nodeIdxStart; nodeIdx < nodeIdxEnd; nodeIdx+=2)
 		{
 			Node node = _NodeBuffer[nodeIdx];
 			if ( node.time > 0)

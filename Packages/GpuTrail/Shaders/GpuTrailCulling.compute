@@ -45,7 +45,7 @@ void UpdateTrailIdxBuffer (uint3 id : SV_DispatchThreadID)
 				}
 			}
 
-			uint backIdx = nodeIdxEnd - 1 - nodeIdx;
+			uint backIdx = nodeIdxEnd - 1 - (nodeIdx - nodeIdxStart);
 			Node nodeBack = _NodeBuffer[backIdx];
 
 			if(nodeBack.time > 0)
