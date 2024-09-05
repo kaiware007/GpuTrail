@@ -259,6 +259,11 @@ namespace GpuTrailSystem
             if (trailIndexBuffer != null)
             {
                 PropertyBlock.SetBuffer(ShaderParam.TrailIndexBuffer, trailIndexBuffer);
+                material.EnableKeyword("GPUTRAIL_TRAIL_INDEX_ON");
+            }
+            else
+            {
+                material.DisableKeyword("GPUTRAIL_TRAIL_INDEX_ON");
             }
             
             var renderParams = new RenderParams(material)

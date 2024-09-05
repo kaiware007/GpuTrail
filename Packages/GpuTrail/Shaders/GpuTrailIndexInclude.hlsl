@@ -22,9 +22,6 @@ inline uint GetTrailNum()
 
 #else
 
-
-#include "GpuTrailCSInclude.hlsl"
-
 inline uint GetTrailIdx(uint bufferIdx)
 {
 	return bufferIdx;

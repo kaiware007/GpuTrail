@@ -17,10 +17,11 @@ SubShader {
 
 		#pragma vertex vert
 		#pragma fragment frag
-		// #pragma multi_compile_local __ GPUTRAIL_TRAIL_INDEX_ON
+		#pragma multi_compile_local __ GPUTRAIL_TRAIL_INDEX_ON
 		
 		#include "UnityCG.cginc"
-		#define GPUTRAIL_TRAIL_INDEX_ON
+
+		uint _TrailNum;
 		#include "GpuTrailIndexInclude.hlsl"
 		#include "GpuTrailShaderInclude.hlsl"
 		
