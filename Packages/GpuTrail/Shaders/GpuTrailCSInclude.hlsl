@@ -5,6 +5,8 @@ struct Trail
 {
 	float startTime;
 	uint totalInputNum;
+	int frameCount;
+	int selectedLod;
 };
 
 struct Node

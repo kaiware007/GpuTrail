@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // UpdateVertex
 ////////////////////////////////////////////////////////////////////////////////
-StructuredBuffer<Trail> _TrailBuffer;
+RWStructuredBuffer<Trail> _TrailBuffer;
 StructuredBuffer<Node> _NodeBuffer;
 RWStructuredBuffer<Vertex> _VertexBuffer;
 
@@ -19,7 +19,8 @@ float3 _CameraPos;   // for perspective camera
 float _StartWidth;
 float _EndWidth;
 uint _LodNodeStep;
-
+int _FrameCount;
+bool _ForceUpdate;
 
 inline bool useToCameraDir()
 {
@@ -93,14 +94,26 @@ void UpdateVertex(uint3 id : SV_DispatchThreadID)
 		uint trailIdx = GetTrailIdx(trailIdxBufferIdx);
 
 		Trail trail = _TrailBuffer[trailIdx];
+
+		// Skip if no update required
+		if(!_ForceUpdate && _FrameCount == trail.frameCount && trail.selectedLod == _LodNodeStep)
+		{
+			return;
+		}
+
+		trail.frameCount = _FrameCount;
+		trail.selectedLod = _LodNodeStep;
+		_TrailBuffer[trailIdx] = trail;
+		
 		uint totalInputNum = trail.totalInputNum;
 
 		////////////////////////////////////////////////////////////
 		// Sequence newest node > oldest node
 		////////////////////////////////////////////////////////////
 		uint endNodeIdxInTrail = (totalInputNum - 1) % _NodeNumPerTrail;
-		uint vertexIdx = (((trailIdxBufferIdx+1) * (_NodeNumPerTrail / _LodNodeStep))-1) * 2;
-
+		// uint vertexIdx = (((trailIdxBufferIdx+1) * (_NodeNumPerTrail / _LodNodeStep))-1) * 2;
+		uint vertexIdx = (((trailIdx+1) * (_NodeNumPerTrail / _LodNodeStep))-1) * 2;
+			
 		Vertex v0 = GetDefaultVertex();
 		Vertex v1 = GetDefaultVertex();
 		uint count = _NodeNumPerTrail / _LodNodeStep;

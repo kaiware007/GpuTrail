@@ -72,9 +72,8 @@ namespace GpuTrailSystem
 
         protected GpuTrail GpuTrail => gpuTrailAppendNode.GpuTrail;
         protected virtual Camera TargetCamera => targetCamera != null ? targetCamera : Camera.main;
-
-        protected bool IsNoCulling => (targetCamera == null  && !cullingEnable);
         
+        protected Vector3 lastCameraPos;
         #region Unity
 
         protected virtual void Start()
@@ -109,7 +108,7 @@ namespace GpuTrailSystem
                 gpuTrailAppendNode.AppendNode();
             }
 
-            if (IsNoCulling)
+            if (targetCamera == null  && !cullingEnable)
             {
                 UpdateVertex(TargetCamera);
                 Render(TargetCamera);
@@ -171,13 +170,16 @@ namespace GpuTrailSystem
             // UpdateVertex
             if (updateVertexEnable)
             {
+                // Force update when camera position change
+                var isForceUpdate = Vector3.Distance(lastCameraPos, camera.transform.position) > float.Epsilon;
                 Profiler.BeginSample("GpuTrailRenderer.UpdateVertexBuffer");
                 ForeachLod((lod, idx) =>
                 {
                     var trailIndexBuffer = trailIndexBuffersLod?[idx] ?? trailIndexBufferCulling;
-                    lod.UpdateVertexBuffer(camera, startWidth, endWidth, trailIndexBuffer);
+                    lod.UpdateVertexBuffer(camera, startWidth, endWidth, isForceUpdate, trailIndexBuffer);
                 });
                 Profiler.EndSample();
+                lastCameraPos = camera.transform.position;
             }
             
 

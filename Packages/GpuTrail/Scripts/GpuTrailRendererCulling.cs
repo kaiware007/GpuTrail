@@ -69,10 +69,9 @@ namespace GpuTrailSystem
             cullingCs.SetBuffer(kernel, CsParam.TrailIndexBufferAppend, trailIndexBuffer);
 
             ComputeShaderUtility.Dispatch(cullingCs, kernel, gpuTrail.trailNum);
-
-            return trailIndexBuffer;
-
+            
 #if true
+            return trailIndexBuffer;
         }
 #else
             if (tmpBuf == null)
@@ -82,9 +81,11 @@ namespace GpuTrailSystem
             GraphicsBuffer.CopyCount(trailIndexBuffer, tmpBuf, 0);
             var count = new uint[1];
             tmpBuf.GetData(count);
-            Debug.Log(count.First());
+            Debug.Log($"{camera.name} Culling {count.First()}");
             var trailIdx = new uint[trailIndexBuffer.count];
             trailIndexBuffer.GetData(trailIdx);
+            
+            return trailIndexBuffer;
         }
         GraphicsBuffer tmpBuf;
 #endif

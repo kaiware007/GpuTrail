@@ -24,8 +24,9 @@ namespace GpuTrailSystem
             public static readonly int EndWidth = Shader.PropertyToID("_EndWidth");
             public static readonly int VertexBuffer = Shader.PropertyToID("_VertexBuffer");
             public static readonly int LodNodeStep = Shader.PropertyToID("_LodNodeStep");
-
-
+            public static readonly int FrameCount = Shader.PropertyToID("_FrameCount");
+            public static readonly int ForceUpdate = Shader.PropertyToID("_ForceUpdate");
+            
             public const string KernelArgsBufferMultiply = "ArgsBufferMultiply";
             public static readonly int ArgsBuffer = Shader.PropertyToID("_ArgsBuffer");
         }
@@ -51,7 +52,7 @@ namespace GpuTrailSystem
         protected GraphicsBuffer vertexBuffer;
         protected GraphicsBuffer indexBuffer;
         protected GraphicsBuffer argsBuffer;
-
+        protected GraphicsBuffer trailIndexBuffer;
 
         private int LodNodeStep => lodSetting.lodNodeStep;
 
@@ -138,7 +139,7 @@ namespace GpuTrailSystem
             argsBuffer = null;
         }
 
-        public void UpdateVertexBuffer(Camera camera, float startWidth, float endWidth, GraphicsBuffer trailIndexBuffer)
+        public void UpdateVertexBuffer(Camera camera, float startWidth, float endWidth, bool forceUpdate, GraphicsBuffer trailIndexBuffer)
         {
             InitBufferIfNeed();
 
@@ -156,7 +157,9 @@ namespace GpuTrailSystem
             computeShader.SetFloat(CsParam.StartWidth, startWidth);
             computeShader.SetFloat(CsParam.EndWidth, endWidth);
             computeShader.SetInt(CsParam.LodNodeStep, LodNodeStep);
-
+            computeShader.SetInt(CsParam.FrameCount, Time.frameCount);
+            computeShader.SetBool(CsParam.ForceUpdate, forceUpdate);
+            
             var kernel = computeShader.FindKernel(CsParam.KernelUpdateVertex);
             gpuTrail.SetCSParams(computeShader, kernel);
             computeShader.SetBuffer(kernel, CsParam.VertexBuffer, vertexBuffer);
@@ -164,21 +167,27 @@ namespace GpuTrailSystem
             if (trailIndexBuffer != null)
             {
                 gpuTrailIndexDispatcher.Dispatch(computeShader, kernel, trailIndexBuffer);
+                this.trailIndexBuffer = trailIndexBuffer;
             }
             else
             {
                 gpuTrailIndexDispatcher.Dispatch(computeShader, kernel, gpuTrail.trailNum);
+                this.trailIndexBuffer = null;
             }
 
 
 
 #if false
-            var trails = new Trail[gpuTrail.trailBuffer.count];
-            gpuTrail.trailBuffer.GetData(trails);
-            var lastNodeIdx = trails[0].totalInputNum % gpuTrail.nodeNumPerTrail;
-
-            var nodes = new Node[gpuTrail.nodeBuffer.count];
-            gpuTrail.nodeBuffer.GetData(nodes);
+            var trails = new Trail[gpuTrail.trailNum];
+            gpuTrail.TrailBuffer.GetData(trails);
+            var str = String.Join(String.Empty, trails.Take(10).Select(t => $"[{t.frameCount}, {t.selectedLod}],").ToArray());
+            Debug.Log($"{camera.name} LodNodeStep {LodNodeStep} forceUpdate {forceUpdate} frameCount {Time.frameCount} {str}");
+#endif
+#if false
+            var lastNodeIdx = trails[0].totalInputNum % gpuTrail.NodeNumPerTrail;
+            
+            var nodes = new Node[gpuTrail.NodeBuffer.count];
+            gpuTrail.NodeBuffer.GetData(nodes);
             //nodes = nodes.Take(100).ToArray();
             var idxAndNodes = Enumerable.Range(0, nodes.Length)
                 .Zip(nodes, (i, node) => new { i, node })
@@ -217,12 +226,12 @@ namespace GpuTrailSystem
 
                 computeShader.Dispatch(kernelArgsBufferMultiply, 1, 1, 1);
             }
-
-            /*
+            
+#if false
             var data = new int[4];
             argsBuffer.GetData(data);
-            Debug.Log($"{data[0]} {data[1]} {data[2]} {data[3]}");
-            */
+            Debug.Log($"UpdateArgsBuffer LodNodeStep {LodNodeStep} {data[0]} {data[1]} {data[2]} {data[3]}");
+#endif
         }
 
         public void ResetArgsBuffer()
@@ -247,6 +256,11 @@ namespace GpuTrailSystem
             PropertyBlock.SetFloat(ShaderParam.EndWidth, endWidth);
             PropertyBlock.SetInt(ShaderParam.VertexNumPerTrail, VertexNumPerTrail);
             PropertyBlock.SetBuffer(ShaderParam.VertexBuffer, vertexBuffer);
+            if (trailIndexBuffer != null)
+            {
+                PropertyBlock.SetBuffer(ShaderParam.TrailIndexBuffer, trailIndexBuffer);
+            }
+            
             var renderParams = new RenderParams(material)
             {
                 matProps = PropertyBlock,

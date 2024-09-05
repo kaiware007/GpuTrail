@@ -4,5 +4,7 @@ namespace GpuTrailSystem
     {
         public float startTime;
         public int totalInputNum;
+        public int frameCount;
+        public int selectedLod;
     }
 }
