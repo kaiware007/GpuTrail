@@ -20,8 +20,7 @@ void UpdateTrailIdxBuffer (uint3 id : SV_DispatchThreadID)
 	{
 		uint nodeIdxStart = calcNodeIdx(trailIdx, 0);
 		uint nodeIdxEnd = nodeIdxStart + _NodeNumPerTrail;
-		uint nodeIdxEndHalf = nodeIdxStart + _NodeNumPerTrail / 2;
-		for(uint nodeIdx = nodeIdxStart; nodeIdx < nodeIdxEndHalf; nodeIdx++)
+		for(uint nodeIdx = nodeIdxStart; nodeIdx < nodeIdxEnd; nodeIdx++)
 		{
 			Node node = _NodeBuffer[nodeIdx];
 
@@ -29,29 +28,6 @@ void UpdateTrailIdxBuffer (uint3 id : SV_DispatchThreadID)
 			{
 				// CheckCulling!
 				float3 posFromCamera = node.pos - _CameraPos;
-
-				if ( 
-					/*
-					(dot(_CameraFrustumNormals[0], posFromCamera) > -_TrailWidth) 
-					&& (dot(_CameraFrustumNormals[1], posFromCamera) > -_TrailWidth)
-					&& (dot(_CameraFrustumNormals[2], posFromCamera) > -_TrailWidth)
-					&& (dot(_CameraFrustumNormals[3], posFromCamera) > -_TrailWidth)
-					*/
-					all(mul(_CameraFrustumNormals, posFromCamera) > -_TrailWidth)
-				)
-				{
-					_TrailIndexBufferAppend.Append(trailIdx);
-					break;
-				}
-			}
-
-			uint backIdx = nodeIdxEnd - 1 - (nodeIdx - nodeIdxStart);
-			Node nodeBack = _NodeBuffer[backIdx];
-
-			if(nodeBack.time > 0)
-			{
-				// CheckCulling!
-				float3 posFromCamera = nodeBack.pos - _CameraPos;
 
 				if ( 
 					/*
