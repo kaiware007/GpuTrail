@@ -139,7 +139,7 @@ namespace GpuTrailSystem
             argsBuffer = null;
         }
 
-        public void UpdateVertexBuffer(Camera camera, float startWidth, float endWidth, bool forceUpdate, GraphicsBuffer trailIndexBuffer)
+        public void UpdateVertexBuffer(Camera camera, Vector3 cameraPosition, float startWidth, float endWidth, bool forceUpdate, GraphicsBuffer trailIndexBuffer)
         {
             InitBufferIfNeed();
 
@@ -152,7 +152,7 @@ namespace GpuTrailSystem
             computeShader.SetFloat(CsParam.Time, Time.time);
 
             computeShader.SetVector(CsParam.ToCameraDir, toCameraDir);
-            computeShader.SetVector(CsParam.CameraPos, camera.transform.position);
+            computeShader.SetVector(CsParam.CameraPos, cameraPosition);
 
             computeShader.SetFloat(CsParam.StartWidth, startWidth);
             computeShader.SetFloat(CsParam.EndWidth, endWidth);

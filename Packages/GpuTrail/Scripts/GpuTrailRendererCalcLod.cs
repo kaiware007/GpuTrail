@@ -69,7 +69,7 @@ namespace GpuTrailSystem
 
 
         // return TrailIndexBuffer in the same order as the lodDistances
-        public virtual IReadOnlyList<GraphicsBuffer> CalcTrailIndexBuffers(IEnumerable<float> lodDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
+        public virtual IReadOnlyList<GraphicsBuffer> CalcTrailIndexBuffers(IEnumerable<float> lodDistances, Vector3 cameraPosition, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
         {
             var idxAndDistances = lodDistances
                 .Select((distance, idx) => (idx, distance))
@@ -83,7 +83,7 @@ namespace GpuTrailSystem
 
             UpdateTrailLodBuffer(
                  idxAndDistances.Select(pair => pair.distance).ToArray(),
-                 camera, gpuTrail, trailIndexBuffer, forceUpdate
+                 cameraPosition, gpuTrail, trailIndexBuffer, forceUpdate
                 );
 
             UpdateTrailIndexBuffers(
@@ -96,13 +96,13 @@ namespace GpuTrailSystem
         }
 
 
-        protected void UpdateTrailLodBuffer(float[] sortedDistances, Camera camera, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
+        protected void UpdateTrailLodBuffer(float[] sortedDistances, Vector3 cameraPosition, GpuTrail gpuTrail, GraphicsBuffer trailIndexBuffer, bool forceUpdate)
         {
             lodDistanceBuffer.SetData(sortedDistances);
 
             var kernel = calcLodCs.FindKernel(CsParam.KernelUpdateTrailLodBuffer);
             gpuTrail.SetCSParams(calcLodCs, kernel);
-            calcLodCs.SetVector(CsParam.CameraPos, camera.transform.position);
+            calcLodCs.SetVector(CsParam.CameraPos, cameraPosition);
             calcLodCs.SetBuffer(kernel, CsParam.LodDistanceBuffer, lodDistanceBuffer);
             calcLodCs.SetBuffer(kernel, CsParam.TrailLodBufferW, trailLodBuffer);
             calcLodCs.SetBuffer(kernel, CsParam.TrailBuffer, gpuTrail.TrailBuffer);

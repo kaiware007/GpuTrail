@@ -48,6 +48,7 @@ namespace GpuTrailSystem
         public float endWidth = 0.1f;
 
         public Camera targetCamera;
+        public Transform targetCameraTransform;
         
         public Bounds bounds = new(Vector3.zero, Vector3.one * 100000f);
 
@@ -55,7 +56,7 @@ namespace GpuTrailSystem
 
         // Culling/CalcLod function can be customized.
         public Func<Camera, GpuTrail, float, GraphicsBuffer> calcTrailIndexBufferCulling;
-        public Func<IEnumerable<float>, Camera, GpuTrail, GraphicsBuffer, bool, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
+        public Func<IEnumerable<float>, Vector3, GpuTrail, GraphicsBuffer, bool, IReadOnlyList<GraphicsBuffer>> calcTrailIndexBufferCalcLod;
 
         protected GpuTrailRendererCulling defaultCulling;
         protected GpuTrailRendererCalcLod defaultCalcLod;
@@ -72,6 +73,7 @@ namespace GpuTrailSystem
 
         protected GpuTrail GpuTrail => gpuTrailAppendNode.GpuTrail;
         protected virtual Camera TargetCamera => targetCamera != null ? targetCamera : Camera.main;
+        protected virtual Transform TargetCameraTransform => targetCameraTransform != null ? targetCameraTransform : TargetCamera.transform;
         
         protected Vector3 lastCameraPos;
         #region Unity
@@ -166,7 +168,7 @@ namespace GpuTrailSystem
                 }
 
                 Profiler.BeginSample("GpuTrailRenderer.CalcTrailIndexBufferCalcLod");
-                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), camera, GpuTrail, trailIndexBufferCulling, isForceUpdate);
+                trailIndexBuffersLod = calcTrailIndexBufferCalcLod(lodSettings.Select(setting => setting.startDistance), TargetCameraTransform.position, GpuTrail, trailIndexBufferCulling, isForceUpdate);
                 Profiler.EndSample();
             }
             
@@ -177,7 +179,7 @@ namespace GpuTrailSystem
                 ForeachLod((lod, idx) =>
                 {
                     var trailIndexBuffer = trailIndexBuffersLod?[idx] ?? trailIndexBufferCulling;
-                    lod.UpdateVertexBuffer(camera, startWidth, endWidth, isForceUpdate, trailIndexBuffer);
+                    lod.UpdateVertexBuffer(camera, TargetCameraTransform.position, startWidth, endWidth, isForceUpdate, trailIndexBuffer);
                 });
                 Profiler.EndSample();
             }
