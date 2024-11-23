@@ -154,7 +154,7 @@ namespace GpuTrailSystem
             }
 
             // Force update when camera position change
-            var isForceUpdate = Vector3.Distance(lastCameraPos, camera.transform.position) > float.Epsilon;
+            var isForceUpdate = Vector3.Distance(lastCameraPos, TargetCameraTransform.position) > float.Epsilon;
 
             // CalcLod
             IReadOnlyList<GraphicsBuffer> trailIndexBuffersLod = null;
@@ -200,7 +200,7 @@ namespace GpuTrailSystem
                 }
             });
             Profiler.EndSample();
-            lastCameraPos = camera.transform.position;
+            lastCameraPos = TargetCameraTransform.position;
         }
 
         protected virtual void Render(Camera camera)
