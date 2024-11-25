@@ -1,4 +1,5 @@
 ﻿#pragma kernel AppendNode NUM_THREAD_X=32
+#pragma kernel Reset NUM_THREAD_X=32
 
 #pragma multi_compile _ IGNORE_ORIGIN
 #pragma multi_compile _ COLOR_ENABLE
@@ -75,5 +76,20 @@ void AppendNode (uint3 id : SV_DispatchThreadID)
 			trail.totalInputNum = totalInputNum;
 			_TrailBuffer[trailIdx] = trail;
 		}
+	}
+}
+
+[numthreads(NUM_THREAD_X,1,1)]
+void Reset (uint3 id : SV_DispatchThreadID)
+{
+	uint trailIdx = id.x;
+	if ( trailIdx < _TrailNum )
+	{
+		Trail trail;
+		trail.totalInputNum = 0;
+		trail.startTime = 0;
+		trail.frameCount = -1;
+		trail.selectedLod = -1;
+		_TrailBuffer[trailIdx] = trail;
 	}
 }

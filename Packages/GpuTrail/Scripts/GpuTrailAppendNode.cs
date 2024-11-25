@@ -9,6 +9,7 @@ namespace GpuTrailSystem
         public static class CsParam
         {
             public const string KernelAppendNode = "AppendNode";
+            public const string KernelReset = "Reset";
             public const string KeywordIgnoreOrigin = "IGNORE_ORIGIN";
             public const string KeywordColorEnable = "COLOR_ENABLE";
 
@@ -108,6 +109,17 @@ namespace GpuTrailSystem
             }
         }
 
+        public void ResetGpuTrail()
+        {
+            if (!gpuTrail.IsInitialized) return;
+            
+            var kernel = appendNodeCS.FindKernel(CsParam.KernelReset);
+                
+            gpuTrail.SetCSParams(appendNodeCS, kernel);
+                
+            ComputeShaderUtility.Dispatch(appendNodeCS, kernel, gpuTrail.trailNum);
+        }
+        
         void SetKeyword(ComputeShader cs, string keyword, bool flag)
         {
             if (flag)

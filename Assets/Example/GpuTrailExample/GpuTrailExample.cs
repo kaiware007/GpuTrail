@@ -1,4 +1,7 @@
-﻿namespace GpuTrailSystem.Example
+﻿using System;
+using UnityEngine;
+
+namespace GpuTrailSystem.Example
 {
     public class GpuTrailExample : GpuTrailAppendNode
     {
@@ -16,6 +19,14 @@
             particle.ReleaseBuffer();
         }
 
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                ResetGpuTrail();
+            }
+        }
 
         protected override int UpdateInputBuffer()
         {

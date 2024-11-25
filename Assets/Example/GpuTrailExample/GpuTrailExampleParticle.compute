@@ -1,4 +1,4 @@
-﻿#pragma kernel CSMain NUM_THREAD_X=32
+﻿#pragma kernel CSMain NUM_THREAD_X=256
 
 struct Particle
 {
